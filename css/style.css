@@ -1,0 +1,58 @@
+
+body {
+	color: #808080;
+	font-family:Monospace;
+	font-size:13px;
+	text-align:left;
+	background-color: #000;
+	margin: 0px;
+	overflow: hidden;
+}
+
+a {
+	color: #0080ff;
+}
+b { color: rgb(255,180,0); }
+
+i { color: rgb(255,255,200); }
+
+.heading { 
+color: rgb(255,180,0); 
+font-size: 18px;
+}
+
+
+.debugster{
+  position:absolute;
+  top:15px;
+  left:15px;
+  text-align:left;
+  width: auto;
+  overflow-y:auto;
+  overflow-x:hidden;
+  height:auto;
+  z-index:5;
+  
+  background-color: rgba(255,255,255,0.1);
+  
+  padding: 10px;
+  color: #FFF;
+}
+
+.tooltip{
+  position:absolute;
+ 
+  text-align:left;
+  width: auto;
+  overflow-y:auto;
+  overflow-x:hidden;
+  height:auto;
+  z-index:15;
+  top: 0px;
+  left: 0px ;
+  
+  background-color: rgba(45,45,65,0.8);
+  
+  padding: 5px;
+  color: #FFF;
+}

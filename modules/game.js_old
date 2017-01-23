@@ -1,0 +1,865 @@
+
+
+
+//document.addEventListener("DOMContentLoaded", function() {
+
+var MOVE_SPEED = 0;
+var FPS = 0;
+var ents = [];	
+var current_ents = [];	
+
+var raycaster = new THREE.Raycaster();
+
+
+var intersected = null;
+
+// var starTexture = new Image();
+// starTexture.canDraw = false
+// starTexture.crossOrigin = "Anonymous";
+// starTexture.onload=function(){
+	// starTexture.canDraw = true;
+// }
+// starTexture.src = 'textures/star.png';
+
+var clusterNames = [];
+clusterNames.push("Expanse");
+clusterNames.push("Reaches");
+clusterNames.push("Cluster");
+clusterNames.push("Nebula");
+clusterNames.push("Traverse");
+clusterNames.push("Systems");
+clusterNames.push("Frontier");
+clusterNames.push("Sea");
+clusterNames.push("Ranges");
+
+
+var letters = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "v", "w", "x", "y", "z"];
+var starnames = [];
+for (var i = 0; i<letters.length; i++) {
+	for (var j = 0; j<letters.length; j++) {
+		//for (var k = 1; k<letters.length; k++) {
+			starnames.push((letters[i]+letters[j]).toUpperCase());
+		//}
+	}
+}
+
+console.log(starnames.length);
+
+var startypes = [];
+
+function startype(name, min, max, color, maxsats, chance) {
+	this.name = name;
+	this.min = min;
+	this.max = max;
+	this.color = color;
+	this.maxsats = maxsats;
+	this.chance = chance;	
+}
+
+function rgb(r,g,b) {
+	this.g = g;	
+	this.b = b;
+	this.r = r;
+	
+	//this.a = a | 255;
+}
+
+var solarRad = 650
+
+startypes.push(new startype("red dwarf", solarRad*0.5, solarRad*1.2, color = new rgb(255, 50, 50), 6, 0));
+startypes.push(new startype("yellow dwarf", solarRad*0.7, solarRad*3, color = new rgb(255, 255, 50), 6, 0.5));
+startypes.push(new startype("red giant", solarRad*15, solarRad*30, new rgb(255, 50, 50), 26, 0.95));
+startypes.push(new startype("blue hypergiant", solarRad*20, solarRad*40, new rgb(50, 100, 255), 26, 0.99));
+
+console.log(startypes);
+
+var SEED = 420;
+
+if ($_GET("seed") & Number($_GET("seed"))) {	
+	SEED = Number($_GET("seed"));
+}
+
+var rand = new random(SEED);
+for (var k = 0; k < 245; k++) {
+	console.log(rand.getRandom());
+}
+console.log(rand.seed);
+
+
+var start_pos_set = false;
+var start_pos = new THREE.Vector3(0,0,0); 
+
+
+//var n;
+
+
+var clusters = [];
+
+var numClusters = Math.round(4+rand.getRandom() * 12);
+
+var galaxy_radius = 100000000000 * numClusters   // 1000000000000//000;	
+
+for (var n_cluster = 0; n_cluster < numClusters; n_cluster++) {	
+	var numStars = Math.round(2+rand.getRandom() * 128);
+	var starDist = numStars * (100000000 + rand.getRandom() * 100000000);
+	
+	//var clusterPos = 
+
+	var cluster = new entity("cluster");
+	cluster.pos = new THREE.Vector3(rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1).multiplyScalar((0.4 + (rand.getRandom()-0.4))*galaxy_radius);
+	cluster.color = rgbToHex(Math.round(rand.getRandom()*255), Math.round(rand.getRandom()*255), Math.round(rand.getRandom()*255));
+	cluster.radius = starDist*1.5 //numStars * 100000;
+	cluster.angles.set(rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1)
+	
+	cluster.name = randomName(rand) + " " + clusterNames[Math.floor(rand.getRandom()*clusterNames.length)]; // starnames[n_cluster % starnames.length];
+	cluster.canSee = false;
+	cluster.spawned = false;
+	clusters.push(cluster);
+	cluster.stars = [];
+	
+	for (var n_star = 0; n_star<numStars; n_star++) { // 10000
+		
+		//console.log(rand.getRandom());
+		
+		//console.log(n_star)
+		
+		var star = new entity("star");
+		star.angles.set(rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1)
+		
+		var myNum = rand.getRandom();	
+		star.typedata = startypes[0];
+		
+		
+		
+		for (n_startype = 0; n_startype < startypes.length; n_startype++) {		
+			if (myNum > startypes[n_startype].chance) {
+				star.typedata = startypes[n_startype];
+				//break;
+			}
+		}
+		
+		var numPlanets = Math.round(rand.getRandom()*star.typedata.maxsats)
+		
+		
+		star.name = cluster.name + "-" + n_star; //"S"+(n_star+1);		
+		
+		star.color = rgbToHex(
+			clamp(Math.round(star.typedata.color.r + (50*rand.getRandom())), 0, 255), 
+			clamp(Math.round(star.typedata.color.g + (50*rand.getRandom())), 0, 255), 
+			clamp(Math.round(star.typedata.color.b + (50*rand.getRandom())), 0, 255) 
+		);
+		
+		if (numPlanets > 7 | rand.getRandom() > 0.7 | (n_cluster == 0 && n_star == 0)) {
+		//star.specialname = 
+			star.name = randomName(rand);
+		}
+		
+		star.parent = cluster;
+		
+		
+		
+		
+		star.pos = new THREE.Vector3(rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1).multiplyScalar((0.3+(rand.getRandom()*0.7))*starDist);
+		
+		star.pos.set(star.pos.x + cluster.pos.x, star.pos.y + cluster.pos.y, star.pos.z + cluster.pos.z)
+		
+		//star.angles = new THREE.Vector3((Math.random() * 2 - 1), (Math.random() * 2 - 1), (Math.random() * 2 - 1));
+		//star.radius = rand.getRandom()	;
+		
+		
+		star.radius = star.typedata.min + (rand.getRandom() * (star.typedata.max - star.typedata.min));
+		
+		star.spawned = false;
+		cluster.stars.push(star);
+		star.planets = [];
+		
+		
+		var orbit_dist = star.radius * 5;
+		for (var n_planet = 0; n_planet<numPlanets; n_planet++) {
+			
+			
+			var num = rand.getRandom()*360;
+			
+			var sin = Math.sin(num % 180);
+			var cos = Math.cos(num % 180);
+			
+			var planet = new entity("planet");
+			
+			planet.name = star.name + "-" + letters[n_planet];
+			
+			//if (star.specialname) {
+			//	planet.name = star.specialname + "-" + letters[n_planet];
+			//}
+			
+			planet.pos = new THREE.Vector3(star.pos.x + sin*orbit_dist, star.pos.y + cos*orbit_dist, star.pos.z)
+			planet.color = rgbToHex(Math.round(rand.getRandom()*255), Math.round(rand.getRandom()*255), Math.round(rand.getRandom()*255));
+			planet.angles.set(rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1)
+			
+			planet.radius = rand.getRandom() * (star.radius*0.01)
+			
+			star.planets.push(planet);
+			planet.moons = [];
+			
+			planet.parent = star;
+			
+			orbit_dist = orbit_dist + (planet.radius*(25+rand.getRandom()*90)) + (star.radius * (45*rand.getRandom()));
+			
+			if (!start_pos_set) {
+				start_pos.set(planet.pos.x-(planet.radius*2), planet.pos.y, planet.pos.z);
+				start_pos_set = true;
+			}
+			
+			
+			
+			var numMoons = Math.round(rand.getRandom() * (planet.radius/2));
+			
+			var moonOrbitDist = planet.radius * 5;
+			for (var n_moon = 0; n_moon<numMoons; n_moon++) {			
+			
+				var num = rand.getRandom()*360;
+				
+				var sin = Math.sin(num % 180);
+				var cos = Math.cos(num % 180);
+				
+				var moon = new entity("moon");
+				moon.angles.set(rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1, rand.getRandom() * 2 - 1)
+				
+				moon.name = planet.name + "-" + (n_moon+1);				
+				
+				
+				moon.pos = new THREE.Vector3(planet.pos.x + sin*moonOrbitDist, planet.pos.y + cos*moonOrbitDist, planet.pos.z)
+				moon.color = rgbToHex(Math.round(rand.getRandom()*255), Math.round(rand.getRandom()*255), Math.round(rand.getRandom()*255));
+				
+				moon.radius = rand.getRandom() * (planet.radius*0.025)
+				
+				if (num>300) { // biig moon low chance?
+					moon.radius = rand.getRandom() * (planet.radius*0.2)					
+				}
+				
+				planet.moons.push(moon);
+				moon.moonlets = [];
+				
+				moon.parent = planet;
+				
+				moonOrbitDist = moonOrbitDist + (moon.radius*(25+rand.getRandom()*90)) + (planet.radius * (45*rand.getRandom()));
+			}
+		}			
+	}
+}
+
+// start three js shit			
+var scene = new THREE.Scene();
+
+
+
+var ply = new player("droke");
+ply.camera.position.set(0,0,0);
+
+ply.pos.set(start_pos.x, start_pos.y, start_pos.z);
+
+// Create shortcuts for window size.
+var width = window.innerWidth;
+var height = window.innerHeight;
+
+// We will use 2D canvas element to render our HUD.  
+var hudCanvas = document.createElement('canvas');
+
+// Again, set dimensions to fit the screen.
+hudCanvas.width = width;
+hudCanvas.height = height;
+
+// Get 2D context and draw something supercool.
+var hudBitmap = hudCanvas.getContext('2d');
+hudBitmap.font = "Normal 16px Monospace";
+hudBitmap.textAlign = 'center';
+hudBitmap.fillStyle = "rgba(245,245,245,0.75)";
+hudBitmap.fillText('Initializing...', width / 2, height / 2);
+
+// Create the camera and set the viewport to match the screen dimensions.
+ var cameraHUD = new THREE.OrthographicCamera(-width/2, width/2, height/2, -height/2, 0, 30 );
+
+// Create also a custom scene for HUD.
+sceneHUD = new THREE.Scene();
+
+// Create texture from rendered graphics.
+var hudTexture = new THREE.Texture(hudCanvas) 
+hudTexture.minFilter = THREE.LinearFilter;
+hudTexture.needsUpdate = true;
+
+// Create HUD material.
+var material = new THREE.MeshBasicMaterial( {map: hudTexture} );
+material.transparent = true;
+
+// Create plane to render the HUD. This plane fill the whole screen.
+var planeGeometry = new THREE.PlaneGeometry( width, height );
+var plane = new THREE.Mesh( planeGeometry, material );
+sceneHUD.add( plane );
+
+
+
+// start 3js
+var renderer = new THREE.WebGLRenderer({antialias: false});
+renderer.setSize( width, height );
+renderer.autoClear = false;
+document.body.appendChild(renderer.domElement);	
+
+var light = new THREE.PointLight( 0xffffff, 1, 1000000 );
+light.position.set( 0, 0, 0 ).normalize();
+scene.add( light );
+
+var light2 = new THREE.AmbientLight( 0x404040 ); // soft white light
+scene.add( light2 );
+
+
+
+
+
+var viewVec = []; //new THREE.Vector3(0,0,0);
+viewVec.x = 0;
+viewVec.y = 0;
+viewVec.z = 0;	
+
+var MOUSEX = 0;
+var MOUSEY = 0;		
+var MOUSEX_prev = 0;
+var MOUSEY_prev = 0;
+
+//	var MOUSEX_VEL = 0;
+//var MOUSEY_VEL = 0
+
+//var CAMX_VEL = 0;
+//var CAMY_VEL = 0;
+//var CAMZ_VEL = 0;
+
+tooltip = [];
+//tooltip.text
+//tooltip.killat
+
+
+var intersectFromScr = false;
+
+var closest = -1;
+var closestName = "";
+var lightMoved = false;
+function think() {
+
+	// Update HUD graphics.
+	//hudBitmap.clearRect(0, 0, width, height);
+	//hudBitmap.fillText("space~~~~" , width / 2, height / 2);
+	//hudTexture.needsUpdate = true;
+
+	intersectFromScr = false;
+	
+	
+	
+	var data = "";
+	
+	data = data + "<i>WSAD to move</i></br>";
+	data = data + "<i>Left click and drag to rotate camera</i></br>";
+	data = data + "<i>Q to increase speed</i></br>";
+	data = data + "<i>E to decrease speed</i></br>";
+	data = data + "<i>J to teleport to tooltip object</i></br>";
+	
+	data = data + "<hr>";
+	
+	data = data + "<b>fps</b>: " + FPS + "</br>";
+	data = data + "<b>seed</b>: " + SEED + "</br>";
+	data = data + "<b>num clusters</b>: " + numClusters + "</br>";
+	data = data + "<b>num entities</b>: " + ents.length + "</br>";
+	data = data + "<b>dist from center</b>: " + distInAU(ply.pos.length()) + " AU</br>";
+	//data = data + "<b>velocity</b>: " + ply.vel.z + " " + ply.vel.y + " " + ply.vel.z + "</br>";
+	data = data + "<b>speed</b>: " + ply.speed + "</br>";
+	
+	if (intersected) {
+		//data = data + "<b>selected</b>: " + intersected + "</br>";
+	}
+	
+	if (closestName != "") {
+		data = data + "<b>system</b>: " + closestName + "</br>";
+	}
+
+	document.getElementById("dataview").innerHTML = data
+	
+	
+	var curtime = (new Date()) - 1 + 1;
+	
+	//console.log(tooltip.killat, curtime, curtime < tooltip.killat)
+	
+	if (curtime < tooltip.killat) {
+		document.getElementById("tooltip").style.top = MOUSEY + "px";
+		document.getElementById("tooltip").style.left = (MOUSEX+20) + "px";
+		document.getElementById("tooltip").innerHTML = tooltip.text;
+		//console.log(tooltip.killat, curtime, )
+	}
+	else {
+		document.getElementById("tooltip").style.left = -1000 + "px";
+	}
+	
+	
+	
+	
+	
+	
+	var distBetween = 1
+	
+	var pos = new THREE.Vector3(ply.pos.x, ply.pos.y, ply.pos.z);
+
+	//light.position.set( -pos.x, -pos.y, -pos.z ).normalize();
+	
+	
+
+	
+	
+	//var entpos = new THREE.Vector3(ent.pos.x, ent.pos.y, ent.pos.z);
+	
+	var viewVec_norm = new THREE.Vector3(viewVec.x, viewVec.y, viewVec.z).normalize(); 
+	
+	
+	var closestDist = 9999999999999999;	
+	var dot = 0;
+	
+	var ent = null;
+	
+	var canSee = false;
+	
+	var length = 0;
+	
+	var entpos = new THREE.Vector3(0,0,0);
+	
+	var index = 0;
+	
+	var scr = new THREE.Vector2( 0, 0 );
+	
+	var mouseVec = new THREE.Vector2( MOUSEX, MOUSEY );
+	
+	var parent = null;
+	var parentPos = new THREE.Vector3(0,0,0);
+	var parentScr = new THREE.Vector2( MOUSEX, MOUSEY );
+	
+	hudBitmap.strokeStyle="rgba(100,250,100,0.4)";
+	hudBitmap.fillStyle="rgba(200,250,200,1)";
+	
+	for (var n = 0; n<ents.length; n++) {
+	
+		ent = ents[n];
+		
+		entpos = new THREE.Vector3(ent.pos.x - pos.x, ent.pos.y - pos.y, ent.pos.z - pos.z);
+		
+		
+		length = entpos.length();
+		
+		canSee = length < (ent.radius*10000000);
+		
+		if (canSee) {	
+						
+			dot = -1;			
+			
+			if (ply.camera.dir) {
+				dot = entpos.normalize().dot(ply.camera.dir);
+			}
+			
+			//if (scr.x < 0 | scr.x > renderer.context.canvas.width | scr.y < 0 | scr.y > renderer.context.canvas.height) {
+				//canSee = false; //length < (ent.radius*200);
+				
+		
+			//}
+			
+			if (dot < 0.3 & length > (ent.radius * 2)) {				
+				canSee = false;
+			}
+			
+			if (n == 0) {
+			//console.log(dot)		;			
+			}
+			
+			
+			//if (dot > 0) {canSee = dot < 0.9;}
+			//if (dot < 0) {canSee = dot > -0.9;}
+			
+			//canSee = Math.abs(dot) < 0.4;
+			
+			//|| length < ((ent.radius*200));
+			
+			//if (intersected & intersected.length>0 & intersected.hasOwnProperty("ent") & intersected.ent == ent) {
+				//console.log(scr);
+			//}			
+		}
+		
+		ent.canSee = canSee;
+		
+		scr = toScreen(ply.camera, entpos);
+		
+		scr.x = clamp(scr.x, 0, renderer.context.canvas.width);
+		scr.y = clamp(scr.y, 0, renderer.context.canvas.height);
+		
+		if (!ent.spawned && canSee) {
+			
+			
+			
+			//console.log(ent.name);
+			
+			if (ent.type == "cluster") {
+				ent.spawned = true;
+				ent.mesh = null;
+			}
+			else {
+				ent.geometry = new THREE.SphereGeometry( ent.radius, 16, 16); //new THREE.BoxGeometry( ent.radius, ent.radius, ent.radius ); //
+
+				ent.material = new THREE.MeshPhongMaterial( { color: ent.color} );
+				
+				ent.mesh = new THREE.Mesh( ent.geometry, ent.material );
+				
+				scene.add(ent.mesh);
+				//console.log(n, ent.name, "added");
+				ent.spawned = true;
+				
+				ent.mesh.position.set(ent.pos.x, ent.pos.y, ent.pos.z);
+				
+				ent.mesh.ent = ent;
+			}
+			current_ents.push(ent.mesh);			
+		}
+		
+		if (ent.spawned && !canSee) {
+			scene.remove(ent.mesh);
+			//console.log(n, "deleted");
+			ent.mesh = null;
+			ent.spawned = false;
+			
+			index = current_ents.indexOf(ent.mesh);
+			if (index >= 0) {
+			  current_ents.splice( index, 1 );
+			}
+			
+			//current_ents.remove(ent);
+		}
+		
+		//planet tracking
+		// if (ent.type == "planet" & length < ent.radius*3000) {				
+			//hudBitmap.fillText("?", scr.x, scr.y);
+			
+			// hudBitmap.beginPath();
+			// hudBitmap.lineWidth="1";
+			// hudBitmap.strokeStyle="rgba(100,200,100, 0.5)";
+			// hudBitmap.rect(scr.x - 2,scr.y - 2,4,4);
+			// hudBitmap.stroke();
+			
+			// hudBitmap.drawImage(starTexture,scr.x, scr.y);
+			
+			// var starTexture = new Image();
+			// starTexture.src = 'textures/glowa_hot_grey.png';	
+			// starTexture.onload = function() {			
+				// hudBitmap.drawImage(starTexture,scr.x, scr.y);
+			
+		// }
+		
+		if (!intersected & intersects.length < 1 & scr.distanceTo( mouseVec ) < 10) {
+			if (!ent.canSee) {intersected = ent.parent;}
+			else {intersected = ent;}
+			intersectFromScr = true;
+		}
+		
+		if (ent.spawned) {
+		
+			//scr = toScreen(ply.camera, entpos);
+			
+			//if (length < (ent.radius*2000)) {				
+				if (ent.canSee) {
+					if (ent.type == "cluster") {
+						hudBitmap.font = "Normal "+(Math.round(12+ent.children.length/6))+"px Monospace";	
+						hudBitmap.fillStyle="rgba(255,0,0,1)";	
+								
+						hudBitmap.fillText(ent.name, scr.x, scr.y);	
+					
+						
+					}
+					
+					if (ent.type == "star") {
+						hudBitmap.font = "Normal 12px Monospace";	
+						hudBitmap.fillStyle="rgba(255,255,0,1)";						
+						hudBitmap.fillText(ent.name, scr.x, scr.y);	
+					}
+					
+					if (ent.type == "planet") {
+						hudBitmap.font = "Normal 12px Monospace";	
+						hudBitmap.fillStyle="rgba(0,255,0,1)";						
+						hudBitmap.fillText(ent.name, scr.x, scr.y);	
+					}
+					
+					if (ent.type == "moon") {
+						hudBitmap.font = "Normal 12px Monospace";	
+						hudBitmap.fillStyle="rgba(0,255,255,1)";						
+						hudBitmap.fillText(ent.name, scr.x, scr.y);	
+					}
+					
+				
+				}
+			//}			
+			
+			if (ent.parent) {			
+				parentPos.set(ent.parent.pos.x - pos.x, ent.parent.pos.y - pos.y, ent.parent.pos.z - pos.z);
+				
+				//if (((parentPos.clone()).normalize()).dot(ply.camera.dir) > 0.6) {
+				if (ent.parent.canSee & intersected == ent.parent) {	
+					parentScr = toScreen(ply.camera, parentPos);
+				
+					parentScr.x = clamp(parentScr.x, 0, renderer.context.canvas.width);
+					parentScr.y = clamp(parentScr.y, 0, renderer.context.canvas.height);
+		
+				
+				
+					hudBitmap.beginPath();
+					
+					hudBitmap.moveTo(scr.x, scr.y);
+					hudBitmap.lineTo(parentScr.x, parentScr.y);
+					hudBitmap.stroke();
+					
+					
+				}
+				
+				
+				
+			}
+						
+			
+			
+		
+			//ent.hudElement.style.top = scr.y +) "px";
+			//ent.hudElement.style.left = (scr.x) + "px";
+		
+			if (ent.mesh != null){
+				ent.mesh.position.set(ent.pos.x - pos.x, ent.pos.y - pos.y, ent.pos.z - pos.z);			
+
+				ent.mesh.updateMatrix();
+			}
+			
+			
+			if (length < ent.radius * 30 && closestDist > length && ent.type == "star" && closest != n) {
+				console.log("entered system - " + ent.name);
+				closestDist = length;
+				closest = n;
+				
+				closestName = ent.name;
+			}
+			
+			
+			// if (closest == n) {
+				// var closest_ent = ents[closest];
+				
+				// if (closest_ent) {
+					
+					// var entpos = new THREE.Vector3(closest_ent.pos.x - pos.x, closest_ent.pos.y - pos.y, closest_ent.pos.z - pos.z);
+					
+					// if (entpos.length() > closest_ent.radius * 30) {
+			
+						// console.log("left system - " + closest_ent.name);
+						// closest = -1;
+						// closestDist = 99999999;
+						
+						// closestName = "";
+						
+					// }
+					
+				// }
+						
+			// }
+			
+			
+			if (closest == n && length > ent.radius * 30) {
+				console.log("left system - " + closestName);
+				closest = -1;
+				closestDist = 99999999;
+				
+				closestName = "";
+			
+			}
+		}
+
+		
+		if (intersected == ent.mesh & !ent.canSee) {
+			intersected = null;
+		}
+	
+		
+		//ent.position.set(entpos.x, entpos.y, entpos.z)
+		
+	}
+	
+	//if (intersected & intersects.length > 0 | ) {
+		//if (!intersected.ent | !intersected.ent.canSee ) {
+		//	intersected = null;
+		//}
+	//}
+
+	//if (closest & !lightMoved) {
+		
+		//light.position.x = entpos.x;
+		//light.position.y = entpos.y;
+		//light.position.z = entpos.z;
+		
+		//lightMoved = true;
+	
+	//}
+	
+	
+	
+
+	
+}
+
+var intersects = [];
+
+function castRays() {
+	
+	//console.log(mouse);
+
+	// raycaster.setFromCamera( mouse, ply.camera );
+	// intersects = raycaster.intersectObjects( current_ents );
+
+	 if (!intersectFromScr) {
+	 
+		// if ( intersects.length > 0 ) {
+			// if (intersected != intersects[ 0 ].object) {
+				// intersected = intersects[ 0 ].object;
+				// console.log("hovered");
+			// }				
+		// } else {
+			 if (intersected) {
+				 intersected = null;
+			 }
+		// }
+	 }
+	
+	// var intersects = raycaster.intersectObjects( scene.children );
+
+	// for ( var i = 0; i < intersects.length; i++ ) {
+
+		// intersects[ i ].object.material.color.set( 0xff0000 );
+	
+	// }
+		
+	
+	//document.getElementById("selected").innerHTML = intersected + " " + intersects.length;
+	
+	if (intersected) {
+		
+		
+		
+		var pos = new THREE.Vector3(ply.pos.x, ply.pos.y, ply.pos.z); 
+		var entpos = new THREE.Vector3(intersected.pos.x - pos.x, intersected.pos.y - pos.y, intersected.pos.z - pos.z);
+		//var viewVec_copy = new THREE.Vector3(viewVec.x, viewVec.y, viewVec.z).normalize();
+		var dist = entpos.length();
+		
+		tooltip.text = "<b>" + intersected.name + "</b></br>"; //+ " - dot: " + (entpos.sub(pos).normalize().dot(viewVec_copy));
+		
+		// if (intersected.ent.specialname) {
+			// tooltip.text = tooltip.text + "<i>" + intersected.ent.specialname + "</i></br>";
+		// }
+		
+		tooltip.text = tooltip.text + "<b>pos</b>: " + intersected.pos.x + ", " + intersected.pos.y + ", " + intersected.pos.z + "</br>";
+		
+		
+		if (distInLY(dist)> 0.1) {
+			tooltip.text = tooltip.text + "<b>dist</b>: " + distInLY(dist) + " LY</br>";
+		}
+		else if (distInAU(dist)> 0.1) {
+			tooltip.text = tooltip.text + "<b>dist</b>: " + distInAU(dist) + " AU</br>";
+		}	
+		else {
+			tooltip.text = tooltip.text + "<b>dist</b>: " + distInKM(dist) + " KM</br>";
+		}
+		
+		if (distInLY(intersected.radius)> 0.1) {
+			tooltip.text = tooltip.text + "<b>radius</b>: " + distInLY(intersected.radius) + " LY</br>";
+		}
+		else if (distInAU(intersected.radius) > 0.1) {
+			tooltip.text = tooltip.text + "<b>radius</b>: " + distInAU(intersected.radius) + " AU</br>";
+		}	
+		else {
+			tooltip.text = tooltip.text + "<b>radius</b>: " + distInKM(intersected.radius) + " KM</br>";
+		}
+		
+		
+		if (intersected.children.length > 0) {
+			tooltip.text = tooltip.text + "<b>satellites</b>: " + intersected.children.length + "</br>";
+		}
+		
+		if (intersected.typedata) {
+			tooltip.text = tooltip.text + "<b>type</b>: " + intersected.typedata.name + "</br>";
+		}
+		
+		if (intersected.type == "planet") {
+			tooltip.text = tooltip.text + "<b>planet class</b>: "
+			
+			if (intersected.radius < 16) {
+				tooltip.text = tooltip.text + "terrestrial";
+			}
+			else {
+				tooltip.text = tooltip.text + "gas";
+				
+				if (intersected.radius > 45) {
+					tooltip.text = tooltip.text + " giant";
+				}
+				else {
+					tooltip.text = tooltip.text + " dwarf";
+				}
+				
+				//if (ent.radius) 
+				
+			}
+			
+			
+			tooltip.text = tooltip.text + "</br>";
+		}
+		
+		
+		
+		tooltip.killat = (new Date()) - 1 + 64;
+		
+		if (keyDown[74]) {
+			ply.pos.x = intersected.pos.x - (ply.camX*(intersected.radius*1.5));
+			ply.pos.y = intersected.pos.y - (ply.camY*(intersected.radius*1.5));
+			ply.pos.z = intersected.pos.z - (ply.camZ*(intersected.radius*1.5));
+			
+				
+		}
+		
+		
+	}
+	
+	//console.log(tooltip);
+
+}
+
+var oldTime = new Date;
+var newTime = 0;
+function animate() {
+	newTime = new Date;					
+	FPS = 1000 / (newTime - oldTime);
+	oldTime = newTime;
+	
+	// Update HUD graphics.
+    hudBitmap.clearRect(0, 0, width, height);
+
+  	
+	
+	think();
+	
+	cameraThink(ply);
+	
+	castRays();
+	
+	renderer.render( scene, ply.camera );	
+	
+	renderer.render(sceneHUD, cameraHUD);
+	
+	requestAnimationFrame( animate );
+	
+	hudTexture.needsUpdate = true;
+}
+
+animate();
+
+		
+//})
+// droke / luke st jack :)
